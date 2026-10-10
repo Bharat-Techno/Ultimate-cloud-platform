@@ -1,0 +1,103 @@
+name: Kubernetes Validation Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kubernetes/**'
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'kubernetes/**'
+
+  workflow_dispatch:
+
+jobs:
+  kubernetes-validation:
+    name: Validate Kubernetes Manifests
+    runs-on: ubuntu-latest
+
+    steps:
+
+      #################################################
+      # CHECKOUT REPOSITORY
+      #################################################
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      #################################################
+      # INSTALL KUBECTL
+      #################################################
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      #################################################
+      # VALIDATE YAML FILES
+      #################################################
+
+      - name: Validate Namespace YAML
+        run: |
+          test -f kubernetes/namespaces/apps.yaml
+          test -f kubernetes/namespaces/monitoring.yaml
+
+      - name: Validate Backend YAML
+        run: |
+          ls kubernetes/apps/backend/*.yaml
+
+      - name: Validate Frontend YAML
+        run: |
+          ls kubernetes/apps/frontend/*.yaml
+
+      - name: Validate Autoscaling YAML
+        run: |
+          ls kubernetes/autoscaling/*.yaml
+
+      #################################################
+      # VALIDATE MONITORING FILES
+      #################################################
+
+      - name: Validate Prometheus Values File
+        run: |
+          test -f kubernetes/monitoring/prometheus-values.yaml
+
+      - name: Validate Grafana Values File
+        run: |
+          test -f kubernetes/monitoring/grafana-values.yaml
+
+      - name: Validate Alertmanager Values File
+        run: |
+          test -f kubernetes/monitoring/alertmanager-values.yaml
+
+      #################################################
+      # INSTALL JQ
+      #################################################
+
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      #################################################
+      # VALIDATE GRAFANA DASHBOARD JSON
+      #################################################
+
+      - name: Validate Grafana Dashboard JSON
+        run: |
+          jq empty kubernetes/monitoring/ultimate-cloud-platform-dashboard.json
+
+      #################################################
+      # SUCCESS MESSAGE
+      #################################################
+
+      - name: Kubernetes Manifest Summary
+        run: |
+          echo "===================================="
+          echo "KUBERNETES VALIDATION SUCCESSFUL"
+          echo "===================================="

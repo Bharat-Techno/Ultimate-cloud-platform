@@ -1,0 +1,72 @@
+name: Terraform Infrastructure Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+
+  workflow_dispatch:
+
+jobs:
+  terraform:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+
+      #################################################
+      # CHECKOUT REPOSITORY
+      #################################################
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      #################################################
+      # SETUP TERRAFORM
+      #################################################
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      #################################################
+      # TERRAFORM FORMAT CHECK
+      #################################################
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      #################################################
+      # TERRAFORM INIT
+      #################################################
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      #################################################
+      # TERRAFORM VALIDATE
+      #################################################
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      #################################################
+      # SUCCESS MESSAGE
+      #################################################
+
+      - name: Terraform Pipeline Success
+        run: |
+          echo "===================================="
+          echo "TERRAFORM VALIDATION SUCCESSFUL"
+          echo "===================================="
