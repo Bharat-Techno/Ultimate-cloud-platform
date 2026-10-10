@@ -1,0 +1,190 @@
+name: Ultimate Platform Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Build Push Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+
+      #################################################
+      # CHECKOUT
+      #################################################
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      #################################################
+      # AWS CONFIG
+      #################################################
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      #################################################
+      # ECR LOGIN
+      #################################################
+
+      - name: Login To Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      #################################################
+      # INSTALL KUBECTL
+      #################################################
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      #################################################
+      # FRONTEND IMAGE
+      #################################################
+
+      - name: Build Frontend Docker Image
+        run: |
+          docker build \
+            -t ultimate-platform-frontend:${{ github.sha }} \
+            ./apps/frontend
+
+      - name: Tag Frontend SHA Image
+        run: |
+          docker tag \
+            ultimate-platform-frontend:${{ github.sha }} \
+            913524913728.dkr.ecr.ap-south-1.amazonaws.com/ultimate-platform-frontend:${{ github.sha }}
+
+      - name: Tag Frontend Latest Image
+        run: |
+          docker tag \
+            ultimate-platform-frontend:${{ github.sha }} \
+            913524913728.dkr.ecr.ap-south-1.amazonaws.com/ultimate-platform-frontend:latest
+
+      - name: Push Frontend SHA Image
+        run: |
+          docker push \
+            913524913728.dkr.ecr.ap-south-1.amazonaws.com/ultimate-platform-frontend:${{ github.sha }}
+
+      - name: Push Frontend Latest Image
+        run: |
+          docker push \
+            913524913728.dkr.ecr.ap-south-1.amazonaws.com/ultimate-platform-frontend:latest
+
+      #################################################
+      # BACKEND IMAGE
+      #################################################
+
+      - name: Build Backend Docker Image
+        run: |
+          docker build \
+            -t ultimate-platform-backend:${{ github.sha }} \
+            ./apps/backend
+
+      - name: Tag Backend SHA Image
+        run: |
+          docker tag \
+            ultimate-platform-backend:${{ github.sha }} \
+            913524913728.dkr.ecr.ap-south-1.amazonaws.com/ultimate-platform-backend:${{ github.sha }}
+
+      - name: Tag Backend Latest Image
+        run: |
+          docker tag \
+            ultimate-platform-backend:${{ github.sha }} \
+            913524913728.dkr.ecr.ap-south-1.amazonaws.com/ultimate-platform-backend:latest
+
+      - name: Push Backend SHA Image
+        run: |
+          docker push \
+            913524913728.dkr.ecr.ap-south-1.amazonaws.com/ultimate-platform-backend:${{ github.sha }}
+
+      - name: Push Backend Latest Image
+        run: |
+          docker push \
+            913524913728.dkr.ecr.ap-south-1.amazonaws.com/ultimate-platform-backend:latest
+
+      #################################################
+      # EKS KUBECONFIG
+      #################################################
+
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region ap-south-1 \
+            --name ultimate-eks-cluster
+
+      #################################################
+      # KUBERNETES DEPLOYMENT
+      #################################################
+
+      - name: Create Namespaces
+        run: |
+          kubectl apply -f kubernetes/namespaces/
+
+      - name: Deploy Backend Resources
+        run: |
+          kubectl apply -f kubernetes/apps/backend/
+
+      - name: Deploy Frontend Resources
+        run: |
+          kubectl apply -f kubernetes/apps/frontend/
+
+      - name: Deploy Autoscaling Resources
+        run: |
+          kubectl apply -f kubernetes/autoscaling/
+
+      #################################################
+      # UPDATE IMAGES
+      #################################################
+
+      - name: Update Frontend Deployment Image
+        run: |
+          kubectl set image deployment/frontend \
+            frontend=913524913728.dkr.ecr.ap-south-1.amazonaws.com/ultimate-platform-frontend:${{ github.sha }} \
+            -n apps
+
+      - name: Update Backend Deployment Image
+        run: |
+          kubectl set image deployment/backend \
+            backend=913524913728.dkr.ecr.ap-south-1.amazonaws.com/ultimate-platform-backend:${{ github.sha }} \
+            -n apps
+
+      #################################################
+      # ROLLOUT VALIDATION
+      #################################################
+
+      - name: Verify Frontend Rollout
+        run: |
+          kubectl rollout status deployment/frontend -n apps --timeout=300s
+
+      - name: Verify Backend Rollout
+        run: |
+          kubectl rollout status deployment/backend -n apps --timeout=300s
+
+      #################################################
+      # CLUSTER VALIDATION
+      #################################################
+
+      - name: Cluster Validation
+        run: |
+          kubectl get nodes
+          kubectl get pods -A
+          kubectl get svc -A
+          kubectl get hpa -A
+
+      #################################################
+      # SUCCESS
+      #################################################
+
+      - name: Deployment Success
+        run: |
+          echo "===================================="
+          echo "ULTIMATE PLATFORM DEPLOYED"
+          echo "===================================="
