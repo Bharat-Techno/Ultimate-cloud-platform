@@ -5,8 +5,8 @@
 crash.log
 
 # Terraform vars
-*.tfvars
-*.tfvars.json
+#*.tfvars
+#*.tfvars.json
 
 # Secrets
 *.pem
