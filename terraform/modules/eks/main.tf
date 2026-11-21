@@ -70,3 +70,16 @@ resource "aws_eks_node_group" "this" {
     aws_iam_role_policy_attachment.cluster_autoscaler_policy
   ]
 }
+
+
+ #################################################
+  # KMS ENCRYPTION
+  #################################################
+
+  encryption_config {
+    provider {
+      key_arn = aws_kms_key.eks.arn
+    }
+
+    resources = ["secrets"]
+  }
